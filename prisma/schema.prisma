@@ -241,3 +241,19 @@ model Notification {
   @@index([userId])
   @@index([read])
 }
+
+enum TransactionStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+  orderReference  String            @unique // ClickPesa transaction/order ID
+  amount          Float
+  phoneNumber     String
+  status          TransactionStatus @default(PENDING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
