@@ -90,6 +90,13 @@ const config = {
     publicUrl: process.env.STORAGE_PUBLIC_URL || '',
   },
 
+  clickPesa: {
+    baseUrl: process.env.CLICKPESA_BASE_URL || 'https://api.clickpesa.com/third-parties',
+    clientId: process.env.CLICKPESA_CLIENT_ID || '',
+    apiKey: process.env.CLICKPESA_API_KEY || '',
+    checksumKey: process.env.CLICKPESA_SECRET_KEY || '',
+  },
+
   fcm: {
     serverKey: process.env.FCM_SERVER_KEY || '',
   },
