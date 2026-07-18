@@ -1,5 +1,5 @@
 {
-  "name": "piki-food-backend",
+  "name": "pikifood_Backend",
   "version": "1.0.4",
   "description": "Production backend for Piki Food delivery app",
   "main": "dist/index.js",
