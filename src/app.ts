@@ -19,6 +19,7 @@ import driverRoutes from './routes/driver';
 import restaurantOwnerRoutes from './routes/restaurantOwner';
 import userRoutes from './routes/users';
 import uploadRoutes from './routes/upload';
+import paymentRoutes, { clickPesaWebhookRouter } from './routes/payment';
 
 const app = express();
 
@@ -58,6 +59,9 @@ if (config.isDev) {
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// ClickPesa webhook (must be before rate limiter)
+app.use('/api/payments', clickPesaWebhookRouter);
 
 // Rate limiting
 app.use('/api/', generalLimiter);
@@ -106,6 +110,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/restaurant-owner', restaurantOwnerRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // 404 handler
 app.use((_req, res) => {

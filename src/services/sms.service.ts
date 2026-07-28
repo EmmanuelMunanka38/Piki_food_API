@@ -10,7 +10,7 @@ function toInternationalFormat(phone: string): string {
     return '+' + digits;
   }
   if (digits.startsWith('7') && digits.length === 9) {
-    return '+255' + digits;
+    return '+255' + digits; 
   }
   return '+' + digits;
 }
@@ -61,10 +61,13 @@ export const sendOtpSms = async (to: string, otp: string): Promise<void> => {
     if (status === 401) {
       console.error('[SMS] Authentication failed. Check AT_USERNAME and AT_API_KEY in .env');
       console.error(`[SMS]   Username: ${username}`);
-      console.error(`[SMS]   API Key: ${apiKey.substring(0, 10)}...`);
+      //console.error(`[SMS]   API Key: ${apiKey.substring(0, 10)}...`); => this exposed api_key (bug fixed here )
+      if (config.isDev && apiKey){
+        const masked = apiKey.replace(/.(?=.{4})/g, '*');
+          console.error('[SMS]   API Key (masked):', masked);
+      }
       console.error('[SMS]   Tip: For sandbox, username must be "sandbox" and API key from sandbox.africastalking.com');
     }
-
-    console.log(`[SMS] [DEV] OTP for ${internationalNumber}: ${otp}`);
+    if (config.isDev) console.log(`[SMS] [DEV] OTP for ${internationalNumber}: ${otp}`); // fixed here 
   }
 };

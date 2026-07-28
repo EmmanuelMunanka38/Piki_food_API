@@ -173,6 +173,7 @@ model Order {
   rider      User?      @relation("RiderOrders", fields: [riderId], references: [id])
   restaurant Restaurant @relation(fields: [restaurantId], references: [id])
   items      OrderItem[]
+  transactions Transaction[]
 
   @@index([userId])
   @@index([restaurantId])
@@ -250,10 +251,14 @@ enum TransactionStatus {
 
 model Transaction {
   id              String            @id @default(uuid())
-  orderReference  String            @unique // ClickPesa transaction/order ID
+  orderReference  String            @unique
+  orderId         String?
+  clickPesaId     String?
   amount          Float
   phoneNumber     String
   status          TransactionStatus @default(PENDING)
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+
+  order Order? @relation(fields: [orderId], references: [id])
 }
