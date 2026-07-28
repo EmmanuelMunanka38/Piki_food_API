@@ -56,7 +56,7 @@ export const initializeSocket = (httpServer: HttpServer): Server => {
 
     // Customer joins order tracking
     socket.on('track:order', (orderId: string) => {
-      socket.join(`order:${orderId}`);
+      socket.join(`order:${orderId}`); 
       console.log(`[WS] User ${socket.userId} tracking order ${orderId}`);
     });
 
