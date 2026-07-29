@@ -1,3 +1,7 @@
+/**
+ * Challanges facing on the auth services : 
+ * 1. When loging in for the first time or sing up when we hit send otp firtst time no otp is sent 
+ */
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import prisma from '../db/prisma';
@@ -5,7 +9,7 @@ import auth, { AuthRequest } from '../middleware/auth';
 import validate from '../middleware/validate';
 import { otpLimiter, authLimiter } from '../middleware/rateLimiter';
 import * as authService from '../services/auth.service';
-
+ 
 const router = Router();
 
 const sendOtpSchema = z.object({
