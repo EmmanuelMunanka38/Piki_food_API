@@ -2,6 +2,11 @@ import axios from 'axios';
 import config from '../config';
 
 export const sendOtpEmail = async (to: string, otp: string): Promise<void> => {
+  const html = buildOtpHtml(otp);
+
+  const canFallbackToSmtp =
+    config.isDev || Boolean(config.email.user && config.email.pass) || config.email.mode !== 'brevo';
+
   if (config.email.mode === 'brevo' && config.email.brevoApiKey) {
     try {
       const { data } = await axios.post(
@@ -28,7 +33,7 @@ export const sendOtpEmail = async (to: string, otp: string): Promise<void> => {
       return;
     } catch (err: any) {
       console.error('[EMAIL] Brevo send failed:', err?.response?.data || err?.message || err);
-      if (config.isDev || (config.email.user && config.email.pass) || config.email.mode === 'self-hosted') {
+      if (canFallbackToSmtp) {
         console.warn('[EMAIL] Falling back to SMTP transport');
       } else {
         throw err;
@@ -73,7 +78,6 @@ export const sendOtpEmail = async (to: string, otp: string): Promise<void> => {
     console.log(`[EMAIL] Dev mode: using Ethereal test account: ${testAccount.user}`);
   }
 
-  const html = buildOtpHtml(otp);
   const info = await transporter.sendMail({
     from: `"Piki Food" <${config.email.from}>`,
     to,
