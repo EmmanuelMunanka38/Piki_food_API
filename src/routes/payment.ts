@@ -5,7 +5,7 @@ import { AuthRequest } from '@/middleware/auth';
 import auth from '@/middleware/auth';
 import validate from '@/middleware/validate';
 import verifyClickPesaWebhook from '@/middleware/verifyweebhook';
-import { initiateUSSDPush } from '@/services/payment.service';
+import { initiateUSSDPush } from '@/services/payment.service'; 
 import { TransactionStatus } from '@prisma/client';
 
 const router = Router();

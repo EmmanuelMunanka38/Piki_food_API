@@ -3,29 +3,37 @@ import config from '../config';
 
 export const sendOtpEmail = async (to: string, otp: string): Promise<void> => {
   if (config.email.mode === 'brevo' && config.email.brevoApiKey) {
-    const html = buildOtpHtml(otp);
-    const { data } = await axios.post(
-      'https://api.brevo.com/v3/smtp/email',
-      {
-        sender: {
-          name: 'Piki Food',
-          email: config.email.from,
+    try {
+      const { data } = await axios.post(
+        'https://api.brevo.com/v3/smtp/email',
+        {
+          sender: {
+            name: 'Piki Food',
+            email: config.email.from,
+          },
+          to: [{ email: to }],
+          subject: 'Your Piki Food verification code',
+          htmlContent: html,
         },
-        to: [{ email: to }],
-        subject: 'Your Piki Food verification code',
-        htmlContent: html,
-      },
-      {
-        headers: {
-          'api-key': config.email.brevoApiKey,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+        {
+          headers: {
+            'api-key': config.email.brevoApiKey,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          timeout: 15000,
         },
-        timeout: 15000,
-      },
-    );
-    console.log(`[EMAIL] OTP sent to ${to} (id: ${data.messageId})`);
-    return;
+      );
+      console.log(`[EMAIL] OTP sent to ${to} (id: ${data.messageId})`);
+      return;
+    } catch (err: any) {
+      console.error('[EMAIL] Brevo send failed:', err?.response?.data || err?.message || err);
+      if (config.isDev || (config.email.user && config.email.pass) || config.email.mode === 'self-hosted') {
+        console.warn('[EMAIL] Falling back to SMTP transport');
+      } else {
+        throw err;
+      }
+    }
   }
 
   const nodemailer = await import('nodemailer');
