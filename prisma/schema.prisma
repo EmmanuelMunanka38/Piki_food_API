@@ -87,23 +87,44 @@ model Restaurant {
   deliveryTime String
   distance     String
   address      String
-  isOpen       Boolean  @default(true)
-  isApproved   Boolean  @default(true)
-  openingHours String?
-  closingHours String?
-  categories   Json     @default("[]")
-  latitude     Float?
-  longitude    Float?
-  ownerId      String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isOpen         Boolean  @default(true)
+  isApproved     Boolean  @default(true)
+  openingHours   String?
+  closingHours   String?
+  customMessage  String?
+  nextOpenTime   String?
+  categories     Json     @default("[]")
+  latitude       Float?
+  longitude      Float?
+  ownerId        String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  owner  User    @relation(fields: [ownerId], references: [id])
-  orders Order[]
+  owner      User         @relation(fields: [ownerId], references: [id])
+  orders     Order[]
+  promotions Promotion[]
 
   @@index([ownerId])
   @@index([cuisine])
   @@index([isOpen])
+}
+
+model Promotion {
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  code         String?
+  image        String?
+  ctaLabel     String   @default("Order Now")
+  isActive     Boolean  @default(true)
+  restaurantId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId])
+  @@index([isActive])
 }
 
 model MenuItem {

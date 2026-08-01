@@ -42,6 +42,8 @@ const updateRestaurantSchema = z.object({
   distance: z.string().optional(),
   address: z.string().optional(),
   isOpen: z.boolean().optional(),
+  customMessage: z.string().optional(),
+  nextOpenTime: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
 });
@@ -155,115 +157,144 @@ router.get('/:id/menu', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-  router.post('/', auth, role('restaurant_owner'), validate(createRestaurantSchema), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post(
+  '/',
+  auth,
+  role('restaurant_owner'),
+  validate(createRestaurantSchema),
+  async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const restaurant = await prisma.restaurant.create({
         data: { ...req.body, isApproved: true, ownerId: req.userId! },
       });
-    res.status(201).json({ success: true, data: restaurant });
-  } catch (error) {
-    console.error('Create restaurant error:', error);
-    res.status(500).json({ success: false, message: 'Failed to create restaurant' });
-  }
-});
-
-router.put('/:id', auth, role('restaurant_owner'), validate(updateRestaurantSchema), async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const restaurant = await prisma.restaurant.findUnique({ where: { id: req.params.id as string } });
-    if (!restaurant) {
-      res.status(404).json({ success: false, message: 'Restaurant not found' });
-      return;
+      res.status(201).json({ success: true, data: restaurant });
+    } catch (error) {
+      console.error('Create restaurant error:', error);
+      res.status(500).json({ success: false, message: 'Failed to create restaurant' });
     }
-    if (restaurant.ownerId !== req.userId) {
-      res.status(403).json({ success: false, message: 'You can only update your own restaurant' });
-      return;
-    }
+  },
+);
 
-    const updated = await prisma.restaurant.update({
-      where: { id: req.params.id as string },
-      data: req.body,
-    });
+router.put(
+  '/:id',
+  auth,
+  role('restaurant_owner'),
+  validate(updateRestaurantSchema),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const restaurant = await prisma.restaurant.findUnique({ where: { id: req.params.id as string } });
+      if (!restaurant) {
+        res.status(404).json({ success: false, message: 'Restaurant not found' });
+        return;
+      }
+      if (restaurant.ownerId !== req.userId) {
+        res.status(403).json({ success: false, message: 'You can only update your own restaurant' });
+        return;
+      }
 
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to update restaurant' });
-  }
-});
-
-router.post('/:id/menu', auth, role('restaurant_owner'), validate(createMenuItemSchema), async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const restaurant = await prisma.restaurant.findUnique({ where: { id: req.params.id as string } });
-    if (!restaurant) {
-      res.status(404).json({ success: false, message: 'Restaurant not found' });
-      return;
-    }
-    if (restaurant.ownerId !== req.userId) {
-      res.status(403).json({ success: false, message: 'You can only add menu to your own restaurant' });
-      return;
-    }
-
-    const menuItem = await prisma.menuItem.create({
-      data: { ...req.body, restaurantId: req.params.id as string },
-    });
-
-    res.status(201).json({ success: true, data: menuItem });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to create menu item' });
-  }
-});
-
-router.put('/menu/:menuId', auth, role('restaurant_owner'), validate(updateMenuItemSchema), async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const menuItem = await prisma.menuItem.findUnique({ where: { id: req.params.menuId as string } });
-    if (!menuItem) {
-      res.status(404).json({ success: false, message: 'Menu item not found' });
-      return;
-    }
-
-    const restaurant = await prisma.restaurant.findUnique({ where: { id: menuItem.restaurantId } });
-    if (!restaurant || restaurant.ownerId !== req.userId) {
-      res.status(403).json({ success: false, message: 'You can only update your own menu items' });
-      return;
-    }
-
-    const updated = await prisma.menuItem.update({
-      where: { id: req.params.menuId as string },
-      data: req.body,
-    });
-
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to update menu item' });
-  }
-});
-
-router.delete('/menu/:menuId', auth, role('restaurant_owner'), async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const menuItem = await prisma.menuItem.findUnique({ where: { id: req.params.menuId as string } });
-    if (!menuItem) {
-      res.status(404).json({ success: false, message: 'Menu item not found' });
-      return;
-    }
-
-    const restaurant = await prisma.restaurant.findUnique({ where: { id: menuItem.restaurantId } });
-    if (!restaurant || restaurant.ownerId !== req.userId) {
-      res.status(403).json({ success: false, message: 'You can only delete your own menu items' });
-      return;
-    }
-
-    await prisma.menuItem.delete({ where: { id: req.params.menuId as string } });
-
-    const uploadKey = getUploadKeyFromUrl(menuItem.image);
-    if (uploadKey) {
-      storage.delete(uploadKey).catch((error) => {
-        console.error('Failed to delete menu item image:', error);
+      const updated = await prisma.restaurant.update({
+        where: { id: req.params.id as string },
+        data: req.body,
       });
-    }
 
-    res.json({ success: true, message: 'Menu item deleted' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to delete menu item' });
-  }
-});
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Failed to update restaurant' });
+    }
+  },
+);
+
+router.post(
+  '/:id/menu',
+  auth,
+  role('restaurant_owner'),
+  validate(createMenuItemSchema),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const restaurant = await prisma.restaurant.findUnique({ where: { id: req.params.id as string } });
+      if (!restaurant) {
+        res.status(404).json({ success: false, message: 'Restaurant not found' });
+        return;
+      }
+      if (restaurant.ownerId !== req.userId) {
+        res.status(403).json({ success: false, message: 'You can only add menu to your own restaurant' });
+        return;
+      }
+
+      const menuItem = await prisma.menuItem.create({
+        data: { ...req.body, restaurantId: req.params.id as string },
+      });
+
+      res.status(201).json({ success: true, data: menuItem });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Failed to create menu item' });
+    }
+  },
+);
+
+router.put(
+  '/menu/:menuId',
+  auth,
+  role('restaurant_owner'),
+  validate(updateMenuItemSchema),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const menuItem = await prisma.menuItem.findUnique({ where: { id: req.params.menuId as string } });
+      if (!menuItem) {
+        res.status(404).json({ success: false, message: 'Menu item not found' });
+        return;
+      }
+
+      const restaurant = await prisma.restaurant.findUnique({ where: { id: menuItem.restaurantId } });
+      if (!restaurant || restaurant.ownerId !== req.userId) {
+        res.status(403).json({ success: false, message: 'You can only update your own menu items' });
+        return;
+      }
+
+      const updated = await prisma.menuItem.update({
+        where: { id: req.params.menuId as string },
+        data: req.body,
+      });
+
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Failed to update menu item' });
+    }
+  },
+);
+
+router.delete(
+  '/menu/:menuId',
+  auth,
+  role('restaurant_owner'),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const menuItem = await prisma.menuItem.findUnique({ where: { id: req.params.menuId as string } });
+      if (!menuItem) {
+        res.status(404).json({ success: false, message: 'Menu item not found' });
+        return;
+      }
+
+      const restaurant = await prisma.restaurant.findUnique({ where: { id: menuItem.restaurantId } });
+      if (!restaurant || restaurant.ownerId !== req.userId) {
+        res.status(403).json({ success: false, message: 'You can only delete your own menu items' });
+        return;
+      }
+
+      await prisma.menuItem.delete({ where: { id: req.params.menuId as string } });
+
+      const uploadKey = getUploadKeyFromUrl(menuItem.image);
+      if (uploadKey) {
+        storage.delete(uploadKey).catch((error) => {
+          console.error('Failed to delete menu item image:', error);
+        });
+      }
+
+      res.json({ success: true, message: 'Menu item deleted' });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Failed to delete menu item' });
+    }
+  },
+);
 
 export default router;

@@ -7,7 +7,7 @@ import { storage } from '../services/storage.service';
 
 const router = Router();
 
-const ALLOWED_TYPES = ['profile', 'restaurant', 'menu'] as const;
+const ALLOWED_TYPES = ['profile', 'restaurant', 'menu', 'promotion'] as const;
 const MAX_SIZE = 5 * 1024 * 1024;
 
 const upload = multer({
@@ -35,7 +35,9 @@ router.post(
       const imageType = (req.body.type || 'menu') as (typeof ALLOWED_TYPES)[number];
 
       if (!ALLOWED_TYPES.includes(imageType)) {
-        res.status(400).json({ success: false, message: 'Invalid upload type. Use: profile, restaurant, or menu' });
+        res
+          .status(400)
+          .json({ success: false, message: 'Invalid upload type. Use: profile, restaurant, menu, or promotion' });
         return;
       }
 

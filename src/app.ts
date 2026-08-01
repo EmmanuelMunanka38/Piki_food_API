@@ -9,7 +9,7 @@ import fs from 'fs';
 import config from './config';
 import { generalLimiter } from './middleware/rateLimiter';
 import errorHandler from './middleware/errorHandler';
-
+// routes ie api_endpoints
 import authRoutes from './routes/auth';
 import restaurantRoutes from './routes/restaurants';
 import orderRoutes from './routes/orders';
@@ -19,6 +19,7 @@ import driverRoutes from './routes/driver';
 import restaurantOwnerRoutes from './routes/restaurantOwner';
 import userRoutes from './routes/users';
 import uploadRoutes from './routes/upload';
+import promotionRoutes from './routes/promotions';
 import paymentRoutes, { clickPesaWebhookRouter } from './routes/payment';
 
 const app = express();
@@ -110,6 +111,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/restaurant-owner', restaurantOwnerRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/promotions', promotionRoutes);
 app.use('/api/payments', paymentRoutes);
 
 // 404 handler

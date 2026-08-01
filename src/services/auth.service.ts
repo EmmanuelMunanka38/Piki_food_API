@@ -76,14 +76,14 @@ export const createOtpRecord = async (email: string, phone: string, role?: strin
     }
   }
 
-  Promise.resolve().then(async () => {
-    try {
-      await sendOtpEmail(cleanEmail, otp);
-      if (config.isDev) console.log(`[DEV] OTP sent to ${cleanEmail}: ${otp}`);
-    } catch (emailError) {
-      console.error(`[BACKGROUND EMAIL ERROR] Failed delivering to ${cleanEmail}:`, emailError);
-    }
-  });
+  try {
+    await sendOtpEmail(cleanEmail, otp);
+    if (config.isDev) console.log(`[DEV] OTP sent to ${cleanEmail}: ${otp}`);
+  } catch (emailError) {
+    console.error(`[EMAIL ERROR] Failed delivering to ${cleanEmail}:`, emailError);
+    // Propagate the error so the API caller receives feedback and can surface it to the user
+    throw emailError;
+  }
 
   return otp;
 };
