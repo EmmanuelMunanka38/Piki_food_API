@@ -13,6 +13,8 @@ export const hashOtp = async (otp: string): Promise<string> => {
   return bcrypt.hash(otp, 10);
 };
 
+export const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+
 const detectRole = (phone: string): { role: 'customer' | 'driver' | 'restaurant_owner'; cleanPhone: string } => {
   if (phone.startsWith('D+255') || phone.startsWith('D07') || phone.startsWith('D06')) {
     return { role: 'driver', cleanPhone: phone.slice(1) };
@@ -28,50 +30,60 @@ export const createOtpRecord = async (email: string, phone: string, role?: strin
   const hashedOtp = await hashOtp(otp);
   const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-  const cleanEmail = email.trim().toLowerCase();
+  const cleanEmail = normalizeEmail(email);
   const rawPhone = phone.replace(/[\s-]/g, '');
   const detected = detectRole(rawPhone);
   const userRole: 'customer' | 'driver' | 'restaurant_owner' = (role as any) || detected.role;
   const cleanPhone = detected.cleanPhone;
 
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [{ email: cleanEmail }, { phone: cleanPhone }],
-    },
-  });
+  // Verification always looks the user up by email, so the OTP must be stored
+  // on a record that is findable by the email used at verify time.
+  let user = await prisma.user.findUnique({ where: { email: cleanEmail } });
 
-  if (existingUser) {
+  if (user) {
     await prisma.user.update({
-      where: { id: existingUser.id },
+      where: { id: user.id },
       data: { otpCode: hashedOtp, otpExpiresAt },
     });
+    console.log(`[OTP CREATE] Existing email ${cleanEmail} -> refresh OTP on user ${user.id}`);
   } else {
-    try {
-      await prisma.user.create({
-        data: {
-          email: cleanEmail,
-          phone: cleanPhone,
-          name: '',
-          role: userRole,
-          otpCode: hashedOtp,
-          otpExpiresAt,
-        },
+    const phoneOwner = cleanPhone ? await prisma.user.findUnique({ where: { phone: cleanPhone } }) : null;
+
+    if (phoneOwner && phoneOwner.email === null) {
+      // Phone-only account: attach the email so email-based verification works.
+      user = await prisma.user.update({
+        where: { id: phoneOwner.id },
+        data: { email: cleanEmail, otpCode: hashedOtp, otpExpiresAt },
       });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        const userRetry = await prisma.user.findFirst({
-          where: { OR: [{ email: cleanEmail }, { phone: cleanPhone }] },
+      console.log(`[OTP CREATE] Phone-only user ${user.id} -> attach email ${cleanEmail} and store OTP`);
+    } else {
+      try {
+        user = await prisma.user.create({
+          data: {
+            email: cleanEmail,
+            // Only claim the phone if it isn't already used by another account.
+            phone: phoneOwner ? null : cleanPhone,
+            name: '',
+            role: userRole,
+            otpCode: hashedOtp,
+            otpExpiresAt,
+          },
         });
-        if (userRetry) {
+        console.log(`[OTP CREATE] Created user ${user.id} (email=${cleanEmail}, phone=${user.phone}) with OTP`);
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          // Race condition: another request created this email/phone between our
+          // lookup and create. Resolve by email (the verification key) and refresh.
+          user = await prisma.user.findUnique({ where: { email: cleanEmail } });
+          if (!user) throw error;
           await prisma.user.update({
-            where: { id: userRetry.id },
+            where: { id: user.id },
             data: { otpCode: hashedOtp, otpExpiresAt },
           });
+          console.log(`[OTP CREATE] Race recovered -> refreshed OTP on user ${user.id}`);
         } else {
           throw error;
         }
-      } else {
-        throw error;
       }
     }
   }
@@ -81,7 +93,7 @@ export const createOtpRecord = async (email: string, phone: string, role?: strin
     if (config.isDev) console.log(`[DEV] OTP sent to ${cleanEmail}: ${otp}`);
   } catch (emailError) {
     console.error(`[EMAIL ERROR] Failed delivering to ${cleanEmail}:`, emailError);
-    // Propagate the error so the API caller receives feedback and can surface it to the user
+    // The OTP record is already committed; surface the failure to the caller.
     throw emailError;
   }
 
@@ -95,7 +107,7 @@ export const verifyOtpCode = async (
   rememberMe?: boolean,
   role?: string,
 ): Promise<{ user: any; accessToken: string; refreshToken: string } | null> => {
-  const cleanEmail = email.trim().toLowerCase();
+  const cleanEmail = normalizeEmail(email);
   const cleanCode = String(code).trim();
 
   const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
