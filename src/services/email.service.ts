@@ -104,7 +104,7 @@ function buildOtpHtml(otp: string): string {
 
   <!-- Main Body Message -->
   <p style="font-size: 16px; line-height: 24px; color: #333333; margin: 0 0 32px 0;">
-    Use the following 6-digit verification code to complete your request. This security code is strictly private and expires in 5 minutes.
+    Use the following 4-digit verification code to complete your request. This security code is strictly private and expires in 5 minutes.
   </p>
 
   <!-- Uber-Style OTP Content Block -->

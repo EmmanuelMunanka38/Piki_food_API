@@ -1,6 +1,6 @@
 /**
- * Challanges facing on the auth services : 
- * 1. When loging in for the first time or sing up when we hit send otp firtst time no otp is sent 
+ * Challanges facing on the auth services :
+ * 1. When loging in for the first time or sing up when we hit send otp firtst time no otp is sent
  */
 import { Router, Response } from 'express';
 import { z } from 'zod';
@@ -9,17 +9,23 @@ import auth, { AuthRequest } from '../middleware/auth';
 import validate from '../middleware/validate';
 import { otpLimiter, authLimiter } from '../middleware/rateLimiter';
 import * as authService from '../services/auth.service';
- 
+
 const router = Router();
 
 const sendOtpSchema = z.object({
   email: z.string().email('Invalid email'),
-  phone: z.string().regex(/^\+?\d{7,15}$/, 'Invalid phone number'),
+  phone: z.string().regex(/^[DR]?\+?\d{7,15}$/, 'Invalid phone number'),
+  role: z.enum(['customer', 'restaurant_owner', 'driver']).optional(),
 });
+
+const toCode = z.preprocess(
+  (val) => (typeof val === 'number' ? String(val) : val),
+  z.string().trim().length(4, 'Code must be 4 digits'),
+);
 
 const verifyOtpSchema = z.object({
   email: z.string().email('Invalid email'),
-  code: z.string().length(4, 'Code must be 4 digits'),
+  code: toCode,
   name: z.string().min(1).max(100).optional(),
   rememberMe: z.boolean().optional(),
   role: z.enum(['customer', 'restaurant_owner', 'driver']).optional(),
@@ -36,7 +42,7 @@ const updateProfileSchema = z.object({
   fcmToken: z.string().optional(),
 });
 
-router.post('/send-otp', otpLimiter, validate(sendOtpSchema), async (req, res: Response): Promise<void> => {
+router.post('/send-otp', validate(sendOtpSchema), otpLimiter, async (req, res: Response): Promise<void> => {
   try {
     const { email, phone, role } = req.body;
     await authService.createOtpRecord(email, phone, role);
@@ -50,7 +56,7 @@ router.post('/send-otp', otpLimiter, validate(sendOtpSchema), async (req, res: R
   }
 });
 
-router.post('/verify-otp', authLimiter, validate(verifyOtpSchema), async (req, res: Response): Promise<void> => {
+router.post('/verify-otp', validate(verifyOtpSchema), authLimiter, async (req, res: Response): Promise<void> => {
   try {
     const { email, code, name, rememberMe, role } = req.body;
     const result = await authService.verifyOtpCode(email, code, name, rememberMe, role);
