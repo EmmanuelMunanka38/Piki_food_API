@@ -96,13 +96,27 @@ export const verifyOtpCode = async (
   role?: string,
 ): Promise<{ user: any; accessToken: string; refreshToken: string } | null> => {
   const cleanEmail = email.trim().toLowerCase();
+  const cleanCode = String(code).trim();
+
   const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
-  if (!user || !user.otpCode || !user.otpExpiresAt) return null;
+  if (!user) {
+    console.warn(`[OTP VERIFY] No user found for email: ${cleanEmail}`);
+    return null;
+  }
+  if (!user.otpCode || !user.otpExpiresAt) {
+    console.warn(`[OTP VERIFY] No OTP in store for user: ${user.id}`);
+    return null;
+  }
+  if (new Date() > user.otpExpiresAt) {
+    console.warn(`[OTP VERIFY] OTP expired for user: ${user.id} (expired ${user.otpExpiresAt.toISOString()})`);
+    return null;
+  }
 
-  if (new Date() > user.otpExpiresAt) return null;
-
-  const isValid = await bcrypt.compare(code, user.otpCode);
-  if (!isValid) return null;
+  const isValid = await bcrypt.compare(cleanCode, user.otpCode);
+  if (!isValid) {
+    console.warn(`[OTP VERIFY] Invalid OTP code for user: ${user.id}`);
+    return null;
+  }
 
   const updateData: any = { otpCode: null, otpExpiresAt: null };
   if (name) updateData.name = name;
