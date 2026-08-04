@@ -21,7 +21,7 @@ const createOrderSchema = z.object({
       })
     )
     .min(1),
-  paymentMethod: z.enum(['mpesa', 'tigo_pesa', 'airtel_money', 'card', 'cash']),
+  paymentMethod: z.enum(['mpesa', 'tigo_pesa', 'airtel_money', 'mixx_by_yas', 'halopesa', 'card', 'cash']),
   deliveryAddress: z.object({
     label: z.string().min(1),
     street: z.string().min(1),
@@ -67,6 +67,7 @@ router.post('/', auth, role('customer'), validate(createOrderSchema), async (req
         name: menuItem.name,
         price: menuItem.price,
         quantity: item.quantity,
+        image: menuItem.image || null,
         specialInstructions: item.specialInstructions || null,
       };
     });
@@ -140,6 +141,56 @@ router.get('/', auth, async (req: AuthRequest, res: Response): Promise<void> => 
     res.json({ success: true, data: orders });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch orders' });
+  }
+});
+
+async function deleteOrdersByIds(orderIds: string[]): Promise<void> {
+  if (orderIds.length === 0) return;
+  await prisma.deliveryRequest.deleteMany({ where: { orderId: { in: orderIds } } });
+  await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+  await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
+  await prisma.transaction.updateMany({
+    where: { orderId: { in: orderIds } },
+    data: { orderId: null },
+  });
+  await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
+}
+
+router.delete('/', auth, role('customer'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { userId: req.userId },
+      select: { id: true },
+    });
+    const orderIds = orders.map((o) => o.id);
+
+    await deleteOrdersByIds(orderIds);
+
+    res.json({ success: true, message: 'All orders deleted', data: { deleted: orderIds.length } });
+  } catch (error) {
+    console.error('Delete all orders error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete orders' });
+  }
+});
+
+router.delete('/:id', auth, role('customer'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const order = await prisma.order.findUnique({ where: { id: req.params.id as string } });
+    if (!order) {
+      res.status(404).json({ success: false, message: 'Order not found' });
+      return;
+    }
+    if (order.userId !== req.userId) {
+      res.status(403).json({ success: false, message: 'You can only delete your own orders' });
+      return;
+    }
+
+    await deleteOrdersByIds([order.id]);
+
+    res.json({ success: true, message: 'Order deleted' });
+  } catch (error) {
+    console.error('Delete order error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete order' });
   }
 });
 
@@ -502,6 +553,7 @@ router.post('/:id/reorder', auth, role('customer'), async (req: AuthRequest, res
         name: menuItem?.name || item.name,
         price,
         quantity: item.quantity,
+        image: menuItem?.image || item.image || null,
         specialInstructions: item.specialInstructions || null,
       };
     });
