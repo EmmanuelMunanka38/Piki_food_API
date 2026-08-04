@@ -5,7 +5,7 @@ import { AuthRequest } from '@/middleware/auth';
 import auth from '@/middleware/auth';
 import validate from '@/middleware/validate';
 import verifyClickPesaWebhook from '@/middleware/verifyweebhook';
-import { initiateUSSDPush } from '@/services/payment.service'; 
+import { initiateUSSDPush } from '@/services/payment.service';
 import { TransactionStatus } from '@prisma/client';
 
 const router = Router();
@@ -40,7 +40,7 @@ router.post('/checkout', auth, validate(checkoutSchema), async (req: AuthRequest
       return;
     }
 
-    const orderReference = `PIKI-${order.orderNumber}-${Date.now()}`;
+    const orderReference = `PIKI${order.orderNumber.replace(/[^A-Za-z0-9]/g, '')}${Date.now().toString().slice(-4)}`;
 
     const clickPesaResponse = await initiateUSSDPush({
       amount,
@@ -74,8 +74,9 @@ router.post('/checkout', auth, validate(checkoutSchema), async (req: AuthRequest
       },
     });
   } catch (error: any) {
+    const detail = error?.response?.data?.message || error?.message || 'Payment processing failed';
     console.error('Checkout error:', error?.response?.data || error.message || error);
-    res.status(500).json({ success: false, message: 'Payment processing failed' });
+    res.status(500).json({ success: false, message: 'Payment processing failed', error: detail });
   }
 });
 
@@ -98,7 +99,7 @@ router.get('/transaction/:orderReference', auth, async (req: AuthRequest, res: R
 });
 
 export const clickPesaWebhookRouter = Router();
-// this is the webhook route that is being exposed to our 
+// this is the webhook route that is being exposed to our
 clickPesaWebhookRouter.post('/webhook', verifyClickPesaWebhook, async (req: any, res: Response): Promise<void> => {
   try {
     const { event, data } = req.body;

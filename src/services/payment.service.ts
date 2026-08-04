@@ -23,7 +23,7 @@ export function createPayloadChecksum(payload: Record<string, any>): string {
   hmac.update(payloadString);
   return hmac.digest('hex');
 }
-//! changing the validation logic for handling payemnts 
+//! changing the validation logic for handling payemnts
 export function validateWebhookChecksum(payload: Record<string, any>, receivedChecksum: string): boolean {
   if (!receivedChecksum) return false;
 
@@ -46,7 +46,7 @@ export async function getClickPesaToken(): Promise<string> {
   }
 
   const response = await axios.post(
-    `${config.clickPesa.baseUrl}/generate-token`,// session token based authentication 
+    `${config.clickPesa.baseUrl}/generate-token`, // session token based authentication
     {},
     {
       headers: {
@@ -75,7 +75,7 @@ export async function initiateUSSDPush(payload: USSDPushPayload) {
   const currency = payload.currency || 'TZS';
 
   const requestBody: Record<string, any> = {
-    amount: payload.amount,
+    amount: String(payload.amount),
     currency,
     orderReference: payload.orderReference,
     phoneNumber: payload.phoneNumber,
