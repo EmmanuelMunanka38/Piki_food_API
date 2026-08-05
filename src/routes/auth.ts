@@ -56,6 +56,7 @@ router.post('/social', validate(socialLoginSchema), authLimiter, async (req, res
     res.status(401).json({
       success: false,
       message: 'Invalid or expired social token. Please try again.',
+      error: error?.message || 'Unknown error',
     });
   }
 });
