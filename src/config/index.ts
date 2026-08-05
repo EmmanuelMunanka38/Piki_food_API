@@ -39,6 +39,11 @@ const config = {
     rememberExpiresIn: process.env.JWT_REMEMBER_EXPIRES_IN || '28d',
   },
 
+  auth0: {
+    domain: process.env.AUTH0_DOMAIN || '',
+    clientId: process.env.AUTH0_CLIENT_ID || '',
+  },
+
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
   },

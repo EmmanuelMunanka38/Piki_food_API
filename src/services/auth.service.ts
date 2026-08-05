@@ -1,10 +1,44 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { JwksClient } from 'jwks-rsa';
 import { Prisma } from '@prisma/client';
 import config from '../config';
 import prisma from '../db/prisma';
 import { JwtPayload } from '../middleware/auth';
 import { sendOtpEmail } from './email.service';
+
+let jwksClient: JwksClient | null = null;
+const getJwksClient = (): JwksClient => {
+  if (!jwksClient) {
+    jwksClient = new JwksClient({
+      jwksUri: `https://${config.auth0.domain}/.well-known/jwks.json`,
+    });
+  }
+  return jwksClient;
+};
+
+export const verifyAuth0Token = (idToken: string): Promise<any> =>
+  new Promise((resolve, reject) => {
+    if (!config.auth0.domain || !config.auth0.clientId) {
+      reject(new Error('Auth0 is not configured'));
+      return;
+    }
+    const getKey = (header: any, callback: (err: Error | null, key?: string) => void) => {
+      getJwksClient().getSigningKey(header.kid, (err: Error | null, key?: any) => {
+        callback(err, key?.getPublicKey());
+      });
+    };
+    jwt.verify(
+      idToken,
+      getKey,
+      {
+        algorithms: ['RS256'],
+        audience: config.auth0.clientId,
+        issuer: `https://${config.auth0.domain}/`,
+      },
+      (err, decoded) => (err ? reject(err) : resolve(decoded)),
+    );
+  });
 export const generateOtp = (): string => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
@@ -184,6 +218,49 @@ export const refreshAccessToken = async (
   } catch {
     return null;
   }
+};
+
+export const socialLogin = async (
+  idToken: string,
+): Promise<{ user: any; accessToken: string; refreshToken: string; isNewUser: boolean }> => {
+  const payload: any = await verifyAuth0Token(idToken);
+
+  const email = payload.email ? normalizeEmail(payload.email) : null;
+  if (!email) {
+    throw new Error('Auth0 account has no email address');
+  }
+  if (!payload.email_verified) {
+    throw new Error('Email is not verified with the provider');
+  }
+
+  const name = typeof payload.name === 'string' ? payload.name : '';
+  const avatar = typeof payload.picture === 'string' ? payload.picture : null;
+
+  let user = await prisma.user.findUnique({ where: { email } });
+  let isNewUser = false;
+
+  if (!user) {
+    user = await prisma.user.create({
+      data: { email, name, avatar, role: 'customer' },
+    });
+    isNewUser = true;
+    console.log(`[SOCIAL] Created user ${user.id} (email=${email}, provider=${payload.sub})`);
+  } else {
+    const updateData: any = {};
+    if (name && user.name !== name) updateData.name = name;
+    if (avatar && user.avatar !== avatar) updateData.avatar = avatar;
+    if (Object.keys(updateData).length > 0) {
+      user = await prisma.user.update({ where: { id: user.id }, data: updateData });
+    }
+  }
+
+  const tokens = await generateTokens(user.id, user.role);
+
+  return {
+    user: sanitizeUser(user),
+    ...tokens,
+    isNewUser,
+  };
 };
 
 export const sanitizeUser = (user: any) => {

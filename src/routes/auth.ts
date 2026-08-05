@@ -42,6 +42,24 @@ const updateProfileSchema = z.object({
   fcmToken: z.string().optional(),
 });
 
+const socialLoginSchema = z.object({
+  idToken: z.string().min(1, 'ID token is required'),
+});
+
+router.post('/social', validate(socialLoginSchema), authLimiter, async (req, res: Response): Promise<void> => {
+  try {
+    const { idToken } = req.body;
+    const result = await authService.socialLogin(idToken);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('Social login error:', error?.message || error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid or expired social token. Please try again.',
+    });
+  }
+});
+
 router.post('/send-otp', validate(sendOtpSchema), otpLimiter, async (req, res: Response): Promise<void> => {
   try {
     const { email, phone, role } = req.body;

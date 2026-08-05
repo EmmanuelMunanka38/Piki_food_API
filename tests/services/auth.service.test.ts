@@ -8,8 +8,19 @@ vi.mock('@/db/prisma', () => {
       user: {
         findUnique: vi.fn(),
         update: vi.fn(),
+        create: vi.fn(),
       },
     },
+  };
+});
+
+vi.mock('jsonwebtoken', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('jsonwebtoken')>();
+  const anyActual = actual as any;
+  return {
+    ...anyActual,
+    default: { ...anyActual.default, verify: vi.fn() },
+    verify: vi.fn(),
   };
 });
 
@@ -92,6 +103,87 @@ describe('Auth Service', () => {
       expect(sanitized).toHaveProperty('id', '123');
       expect(sanitized).toHaveProperty('phone', '+255712345678');
       expect(sanitized).toHaveProperty('name', 'Test User');
+    });
+  });
+
+  describe('socialLogin', () => {
+    const mockVerifyToken = (payload: any) => {
+      (jwt.verify as any).mockImplementation(
+        (token: string, _key: unknown, _opts: unknown, cb: (err: any, decoded?: any) => void) =>
+          cb(null, payload),
+      );
+    };
+
+    it('should throw when the Auth0 token payload has no email', async () => {
+      mockVerifyToken({ sub: 'google-oauth2|123', email_verified: true });
+
+      await expect(authService.socialLogin('some-id-token')).rejects.toThrow(
+        'has no email address',
+      );
+    });
+
+    it('should throw when the provider email is not verified', async () => {
+      mockVerifyToken({
+        sub: 'google-oauth2|123',
+        email: 'user@example.com',
+        email_verified: false,
+      });
+
+      await expect(authService.socialLogin('some-id-token')).rejects.toThrow(
+        'not verified',
+      );
+    });
+
+    it('should create a new customer user and issue tokens', async () => {
+      const prisma = (await import('@/db/prisma')).default;
+      mockVerifyToken({
+        sub: 'google-oauth2|123',
+        email: 'newuser@example.com',
+        email_verified: true,
+        name: 'New User',
+        picture: 'https://example.com/avatar.png',
+      });
+      (prisma.user.findUnique as any).mockResolvedValueOnce(null);
+      (prisma.user.create as any).mockResolvedValueOnce({
+        id: 'social-user-1',
+        email: 'newuser@example.com',
+        name: 'New User',
+        avatar: 'https://example.com/avatar.png',
+        role: 'customer',
+        phone: null,
+      });
+      (prisma.user.update as any).mockResolvedValue({});
+
+      const result = await authService.socialLogin('some-id-token');
+
+      expect(result.isNewUser).toBe(true);
+      expect(result.user.role).toBe('customer');
+      expect(result.user.id).toBe('social-user-1');
+      expect(result.accessToken).toBeDefined();
+      expect(result.refreshToken).toBeDefined();
+    });
+
+    it('should log in an existing user without changing role', async () => {
+      const prisma = (await import('@/db/prisma')).default;
+      mockVerifyToken({
+        sub: 'google-oauth2|123',
+        email: 'existing@example.com',
+        email_verified: true,
+        name: 'Existing User',
+      });
+      (prisma.user.findUnique as any).mockResolvedValueOnce({
+        id: 'social-user-2',
+        email: 'existing@example.com',
+        name: 'Existing User',
+        role: 'customer',
+        phone: null,
+      });
+      (prisma.user.update as any).mockResolvedValue({});
+
+      const result = await authService.socialLogin('some-id-token');
+
+      expect(result.isNewUser).toBe(false);
+      expect(result.user.role).toBe('customer');
     });
   });
 });
